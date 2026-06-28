@@ -2,9 +2,9 @@
 
 ### simulates data from a receiver into a rabbit MQ queue. Then is consumed by a reader that writes to a database ###
 
-Assuming docker is installed this can be run by just using the docker-compose file and configuring a .env file.
+Assuming docker/docker-compose is installed this can be run by just using the docker-compose file and configuring a .env file.
 
-There is an included example.env that contains everything but likely the password should be altered in a real enviornment. so simply copy it with the updated changes.
+There is an included example.env that contains everything but the password should be altered in a real enviornment. so simply copy it and make changes if you would like.
 ```bash
 cp example.env .env
 docker-compose up
@@ -17,7 +17,7 @@ docker-compose up
 - [ ] A queue manager of some variety (using rabbitMQ but I suspect this would not be sufficient)
 - [ ] Any type of processing time for any of the core functions and any optimizations
 - [ ] Logging is just printing. This works OK as is as it leans on docker logging
-- [ ] The connection should be more persistent. Turning it off and on is really not ideal
+- [ ] The message broker connection should be more persistent. Turning it off and on is really not ideal
 - [ ] There are no triggers for when the device uuid does not match anything in the database. Causing it to write another one. This is mainly because checking every time is too expensive. I'd like to try the following strategies (in no particular order)
 	- just writing the uuid that comes over and ignoring whether or not it exists
 	- researching if there is any sql logic that solves this issue using sub-queries of some variety
