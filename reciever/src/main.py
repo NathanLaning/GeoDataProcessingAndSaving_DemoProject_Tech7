@@ -1,5 +1,4 @@
 import json
-from time import sleep as pause
 from typing import Any
 from tools.connection import createConnection
 from tools.types import ECEF
@@ -24,6 +23,9 @@ def checkForMessages():
     channel.start_consuming()
 
 def messageCallback(_channel, _method, _properties, body: Any):
+    """
+    RabbitMQ Message Callback for when a message is recived
+    """
     try:
         log("Message Recieved! Writing to database...")
         ECEF_Data = ECEF(**json.loads(body.decode()))
