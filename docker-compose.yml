@@ -26,7 +26,6 @@ services:
       RABBITMQ_DEFAULT_PASS: ${RABBIT_PASSWORD}
     volumes:
       - rabbitmq_volume:/var/lib/rabbitmq
-      - ./rabbit_setup/definitions.json:/etc/rabbitmq/definitions.json:ro
     networks:
       - rabbitmqNetwork
 
