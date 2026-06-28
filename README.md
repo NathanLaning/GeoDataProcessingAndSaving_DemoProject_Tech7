@@ -1,4 +1,4 @@
-Basic Geographic data converter
+***Basic Geographic data converter***
 
 simulates data from a receiver into a rabbit MQ queue. Then is consumed by a reader that writes to a database
 
