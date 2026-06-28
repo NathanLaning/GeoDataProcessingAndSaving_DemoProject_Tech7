@@ -28,3 +28,5 @@ docker-compose up
 - [ ] Environment variables are done in a very sloppy way that I do not like but functionally is likely fine. either need to separate this out or pass more variables
 - [ ] I think the database table names could use full names instead of short names. This is fine in a small use case, but terrible in a large one
 - [ ] README leaves a bit to be desired, especially in terms of how a dev setup would work 
+- [ ] Using relatively old versions of postgres/postgis and python. These likely could be upgraded but I started lower for gaurenteed compatability. Rabbit is fine as is because it is a placeholder anyways
+- [ ] DB write/reads have no safety nets for failure or malformed/malicious SQL.
