@@ -1,0 +1,6 @@
+watchdog
+pika
+python-dotenv
+AstroPy
+pymap3d
+pydantic

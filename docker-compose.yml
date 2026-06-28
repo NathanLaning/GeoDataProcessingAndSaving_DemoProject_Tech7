@@ -1,0 +1,82 @@
+services:
+  postgres:
+    image: postgis/postgis:15-3.5
+    container_name: postgres
+    hostname: postgres
+    ports:
+      - "${POSTGRES_PORT_GLOBAL}:${POSTGRES_PORT_LOCAL}"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_volume:/var/lib/postgresql/data
+    networks:
+      - dbNetwork
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: rabbitmq
+    hostname: rabbitmq
+    ports:
+      - "${RABBIT_PUBSUB_PORT}:5672"
+      - "${RABBIT_WEBCLIENT_PORT}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASSWORD}
+    volumes:
+      - rabbitmq_volume:/var/lib/rabbitmq
+      - ./rabbit_setup/definitions.json:/etc/rabbitmq/definitions.json:ro
+    networks:
+      - rabbitmqNetwork
+
+  reciever:
+    build: ./reciever
+    container_name: reciever
+    env_file:
+      - .env
+    volumes:
+      - ./reciever/src:/app/src
+      - ./tools:/app/src/tools
+    environment:
+      - PYTHONUNBUFFERED=1
+    stdin_open: true
+    tty: true
+    depends_on:
+      - rabbitmq
+      - postgres
+    networks:
+      - rabbitmqNetwork
+      - dbNetwork
+
+  sender:
+    build: ./sender
+    container_name: sender
+    env_file:
+      - .env
+    volumes:
+      - ./sender/src:/app/src
+      - ./tools:/app/src/tools
+    environment:
+      - PYTHONUNBUFFERED=1
+    stdin_open: true
+    tty: true
+    depends_on:
+      - rabbitmq
+    networks:
+      - rabbitmqNetwork
+      - dbNetwork
+
+networks:
+  dbNetwork:
+    name: db_network
+    driver: bridge
+  rabbitmqNetwork:
+    name: rabbitmq_network
+    driver: bridge
+
+volumes:
+  rabbitmq_volume:
+    driver: local
+  postgres_volume:
+    driver: local
+
