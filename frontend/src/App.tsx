@@ -1,5 +1,6 @@
 import {  useMemo, useState } from 'react'
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
+import { convertDateToTimeStampString } from './tools/tools'
 import {
   CartesianGrid,
   Legend,
@@ -11,82 +12,17 @@ import {
   YAxis,
 } from 'recharts'
 import './App.css'
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools/production'
 
-type Records = {
-  locations: LocationRecord[]
-  ecef: EcefRecord[]
-}
-type LocationRecord = {
-  timestamp: string
-  geography_position: string
-  device_uuid: string
-}
-
-type EcefRecord = {
-  timestamp: string
-  x_coordinate: number
-  y_coordinate: number
-  z_coordinate: number
-  device_uuid: string
-}
-
-type ParsedLocationPoint = {
-  timestamp: string
-  device_uuid: string
-  latitude: number
-  longitude: number
-}
-
-const queryClient = new QueryClient()
+import type { Records } from './types/Location'
 
 function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ReactQueryDevtools />
-      <UI />
-    </QueryClientProvider>
-  )
-}
-
-const parseLocationPoint = (value: string): ParsedLocationPoint | null => {
-  const cleanedValue = value.replace(/[a-zA-Z()]/g, ' ')
-  const coordinates = cleanedValue
-    .split(/\s+/)
-    .map((entry) => Number.parseFloat(entry))
-    .filter((entry) => !Number.isNaN(entry))
-
-  if (coordinates.length < 2) {
-    return null
-  }
-
-  return {
-    timestamp: '',
-    device_uuid: '',
-    latitude: coordinates[0],
-    longitude: coordinates[1],
-  }
-}
-
-const formatDateTimeInput = (value: Date) => {
-  const year = value.getFullYear()
-  const month = String(value.getMonth() + 1).padStart(2, '0')
-  const day = String(value.getDate()).padStart(2, '0')
-  const hours = String(value.getHours()).padStart(2, '0')
-  const minutes = String(value.getMinutes()).padStart(2, '0')
-  const seconds = String(value.getSeconds()).padStart(2, '0')
-
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-}
-
-function UI() {
   const [error, setError] = useState('')
   const [startDate, setStartDate] = useState(() => {
     const date = new Date()
     date.setDate(date.getDate() - 6)
-    return formatDateTimeInput(date)
+    return convertDateToTimeStampString(date)
   })
-  const [endDate, setEndDate] = useState(() => formatDateTimeInput(new Date()))
+  const [endDate, setEndDate] = useState(() => convertDateToTimeStampString(new Date()))
   const [dataLimit, setDataLimit] = useState(100)
 
   const loadData = async (): Promise<Records> => {
@@ -116,7 +52,37 @@ function UI() {
     queryKey: ['locationQuery', startDate, endDate, dataLimit],
     queryFn: loadData,
   })
+const ecefSeriesDerivivative = useMemo(
+    () =>
+      (locationData.data?.ecef ?? [])
+        .slice()
+        .reverse()
+        .map((item, index, array) => {
+          if (index === 0) {
+            return {
+              timestamp: new Date(item.timestamp).toLocaleTimeString(),
+              x: 0,
+              y: 0,
+              z: 0,
+              average: 0,
+              device: item.device_uuid,
+            }
+          }
 
+          const previousItem = array[index - 1]
+          const timeDifference = new Date(item.timestamp).getTime() - new Date(previousItem.timestamp).getTime()
+
+          return {
+            timestamp: new Date(item.timestamp).toLocaleTimeString(),
+            x: (item.x_coordinate - previousItem.x_coordinate) / timeDifference,
+            y: (item.y_coordinate - previousItem.y_coordinate) / timeDifference,
+            z: (item.z_coordinate - previousItem.z_coordinate) / timeDifference,
+            average: (item.x_coordinate + item.y_coordinate + item.z_coordinate) / (3 * timeDifference),
+            device: item.device_uuid,
+          }
+        }),
+    [locationData.data],
+  )
   const ecefSeries = useMemo(
     () =>
       (locationData.data?.ecef ?? [])
@@ -127,25 +93,9 @@ function UI() {
           x: item.x_coordinate,
           y: item.y_coordinate,
           z: item.z_coordinate,
+          average: (item.x_coordinate + item.y_coordinate + item.z_coordinate) / 3,
           device: item.device_uuid,
         })),
-    [locationData.data],
-  )
-
-  const locationPoints = useMemo(
-    () =>
-      (locationData.data?.locations ?? [])
-        .slice()
-        .reverse()
-        .map((item) => {
-          const parsed = parseLocationPoint(item.geography_position)
-
-          return {
-            timestamp: new Date(item.timestamp).toLocaleTimeString(),
-            latitude: parsed?.latitude ?? 0,
-            longitude: parsed?.longitude ?? 0,
-          }
-        }),
     [locationData.data],
   )
 
@@ -163,11 +113,11 @@ function UI() {
 
         <div className="range-controls">
           <label className="field-label">
-            <span>Start date &amp; time</span>
+            <span>Start date & time</span>
             <input type="datetime-local" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
           </label>
           <label className="field-label">
-            <span>End date &amp; time</span>
+            <span>End date & time</span>
             <input type="datetime-local" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
           </label>
           <label className="field-label">
@@ -184,36 +134,39 @@ function UI() {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={ecefSeries} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="timestamp" />
-                  <YAxis />
+                  <XAxis dataKey="timestamp" scale="auto" />
+                  <YAxis scale="auto" />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="x" stroke="#f79a38" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="y" stroke="#02d9ff" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="z" stroke="#00f9a6" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="x" stroke="#f79a38" opacity={0.5} strokeWidth={3}  dot={true} />
+                  <Line type="monotone" dataKey="y" stroke="#02d9ff" opacity={0.5} strokeWidth={3}  dot={true} />
+                  <Line type="monotone" dataKey="z" stroke="#00f9a6" opacity={0.5} strokeWidth={3}  dot={true} />
+                  <Line type="monotone" dataKey="average" stroke="#fff"  strokeWidth={4}  dot={true} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </article>
-          </div>
-          <div className="dashboard-grid">
+        </div>
+        <div className="dashboard-grid">
           <article className="chart-card">
-            <h2>Location trend</h2>
+            <h2>ECEF Derivative trend</h2>
             <div className="chart-box">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={locationPoints} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <LineChart data={ecefSeriesDerivivative} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="timestamp" />
-                  <YAxis />
+                  <XAxis dataKey="timestamp" scale="auto" />
+                  <YAxis scale="auto" />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="latitude" stroke="#f79a38" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="longitude" stroke="#02d9ff" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="x" stroke="#f79a38" opacity={0.5} strokeWidth={3}  dot={true} />
+                  <Line type="monotone" dataKey="y" stroke="#02d9ff" opacity={0.5} strokeWidth={3}  dot={true} />
+                  <Line type="monotone" dataKey="z" stroke="#00f9a6" opacity={0.5} strokeWidth={3}  dot={true} />
+                  <Line type="monotone" dataKey="average" stroke="#fff"  strokeWidth={4}  dot={true} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </article>
-          </div>
+        </div>
       </section>
     </main>
   )
