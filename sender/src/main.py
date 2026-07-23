@@ -49,7 +49,7 @@ def main():
     ###############
     while True:
         try:
-            sendFakeMessage(3)
+            sendFakeMessage(10)
         except Exception as e:
             log(f"Error occurred: {e}")
             # Todo: Write to a real log here

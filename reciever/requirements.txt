@@ -4,3 +4,5 @@ python-dotenv
 pydantic
 pymap3d
 psycopg2-binary
+fastapi
+uvicorn
