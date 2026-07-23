@@ -10,7 +10,7 @@ load_dotenv()
 
 def ensureQueueExists():
     """
-    this likely should not exist!
+    This should be unecessary
     """
     rabbitmq_connection = createConnection()
     channel = rabbitmq_connection.channel()
@@ -38,14 +38,18 @@ def sendFakeMessage(delay: int = 4):
     ##############
 
 def main():
+    """
+    Main loop, sends fake messages to rabbitMQ
+    """
     ###############
     # Todo: remove
-    # this should be handled by docker. But this will do for now
+    # this should be handled by docker. and only happens once
+    # So if for any reason the broker is down this will not even work
     ensureQueueExists()
     ###############
     while True:
         try:
-            sendFakeMessage(3)
+            sendFakeMessage(10)
         except Exception as e:
             log(f"Error occurred: {e}")
             # Todo: Write to a real log here

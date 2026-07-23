@@ -4,6 +4,7 @@ import os
 from tools.log import log
 from tools.types import ECEF, LongLatHeight
 import psycopg2
+from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,6 +25,90 @@ def writeEntry(exceutionString: str):
     cursor.execute(exceutionString)
     conn.commit()
     conn.close()
+
+
+def fetchLatestLocationData(limit: int = 10, start_date: str | None = None, end_date: str | None = None):
+    conn = psycopg2.connect(
+        dbname=os.getenv("POSTGRES_DB"),
+        user=os.getenv("POSTGRES_USER"),
+        password=os.getenv("POSTGRES_PASSWORD"),
+        host=os.getenv("POSTGRES_HOST"),
+        port=os.getenv("POSTGRES_PORT_LOCAL")
+    )
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    sql = """
+        SELECT
+            llh.timestamp,
+            ST_AsText(llh.geography_position) AS geography_position,
+            device.uuid AS device_uuid
+        FROM llh
+        JOIN device ON llh.device_id = device.id
+    """
+    conditions = []
+    params: list[object] = []
+
+    if start_date:
+        conditions.append('llh.timestamp >= TO_TIMESTAMP(%s, \'YYYY-MM-DD"T"HH24:MI\')')
+        params.append(start_date)
+
+    if end_date:
+        conditions.append('llh.timestamp < TO_TIMESTAMP(%s, \'YYYY-MM-DD"T"HH24:MI\')')
+        params.append(end_date)
+
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
+
+    sql += " ORDER BY llh.timestamp DESC LIMIT %s"
+    params.append(limit)
+
+    cursor.execute(sql, tuple(params))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def fetchLatestECEFData(limit: int = 10, start_date: str | None = None, end_date: str | None = None):
+    conn = psycopg2.connect(
+        dbname=os.getenv("POSTGRES_DB"),
+        user=os.getenv("POSTGRES_USER"),
+        password=os.getenv("POSTGRES_PASSWORD"),
+        host=os.getenv("POSTGRES_HOST"),
+        port=os.getenv("POSTGRES_PORT_LOCAL")
+    )
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+    sql = """
+        SELECT
+            ecef.timestamp,
+            ecef.x_coordinate,
+            ecef.y_coordinate,
+            ecef.z_coordinate,
+            device.uuid AS device_uuid
+        FROM ecef
+        JOIN device ON ecef.device_id = device.id
+    """
+    conditions = []
+    params: list[object] = []
+
+    if start_date:
+        conditions.append('ecef.timestamp >= TO_TIMESTAMP(%s, \'YYYY-MM-DD"T"HH24:MI\')')
+        params.append(start_date)
+
+    if end_date:
+        conditions.append('ecef.timestamp < TO_TIMESTAMP(%s, \'YYYY-MM-DD"T"HH24:MI\')')
+        params.append(end_date)
+
+    if conditions:
+        sql += " WHERE " + " AND ".join(conditions)
+
+    sql += " ORDER BY ecef.timestamp DESC LIMIT %s"
+    params.append(limit)
+
+    cursor.execute(sql, tuple(params))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
 
 def ECEFWrite(data: ECEF | None):
     if data is None:
