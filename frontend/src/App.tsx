@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import {  useMemo, useState } from 'react'
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import {
   CartesianGrid,
   Legend,
@@ -10,7 +11,12 @@ import {
   YAxis,
 } from 'recharts'
 import './App.css'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools/production'
 
+type Records = {
+  locations: LocationRecord[]
+  ecef: EcefRecord[]
+}
 type LocationRecord = {
   timestamp: string
   geography_position: string
@@ -30,6 +36,17 @@ type ParsedLocationPoint = {
   device_uuid: string
   latitude: number
   longitude: number
+}
+
+const queryClient = new QueryClient()
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ReactQueryDevtools />
+      <UI />
+    </QueryClientProvider>
+  )
 }
 
 const parseLocationPoint = (value: string): ParsedLocationPoint | null => {
@@ -57,13 +74,12 @@ const formatDateTimeInput = (value: Date) => {
   const day = String(value.getDate()).padStart(2, '0')
   const hours = String(value.getHours()).padStart(2, '0')
   const minutes = String(value.getMinutes()).padStart(2, '0')
+  const seconds = String(value.getSeconds()).padStart(2, '0')
 
-  return `${year}-${month}-${day}T${hours}:${minutes}`
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
-function App() {
-  const [locations, setLocations] = useState<LocationRecord[]>([])
-  const [ecef, setEcef] = useState<EcefRecord[]>([])
+function UI() {
   const [error, setError] = useState('')
   const [startDate, setStartDate] = useState(() => {
     const date = new Date()
@@ -72,34 +88,38 @@ function App() {
   })
   const [endDate, setEndDate] = useState(() => formatDateTimeInput(new Date()))
   const [dataLimit, setDataLimit] = useState(100)
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const query = new URLSearchParams({
-          limit: dataLimit.toString(),
-          startDate,
-          endDate,
-        })
 
-        const response = await fetch(`/api/recentData?${query.toString()}`)
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`)
-        }
+  const loadData = async (): Promise<Records> => {
+    try {
+      const query = new URLSearchParams({
+        limit: dataLimit.toString(),
+        startDate,
+        endDate,
+      })
 
-        const payload = await response.json()
-        setLocations(payload.locations ?? [])
-        setEcef(payload.ecef ?? [])
-      } catch (caughtError) {
-        setError(caughtError instanceof Error ? caughtError.message : 'Unknown error')
+      const response = await fetch(`/api/recentData?${query.toString()}`)
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`)
       }
-    }
 
-    void loadData()
-  }, [startDate, endDate, dataLimit])
+      const payload = (await response.json()) as Records
+      setError('')
+      return payload
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : 'Unknown error'
+      setError(message)
+      throw caughtError
+    }
+  }
+
+  const locationData = useQuery({
+    queryKey: ['locationQuery', startDate, endDate, dataLimit],
+    queryFn: loadData,
+  })
 
   const ecefSeries = useMemo(
     () =>
-      ecef
+      (locationData.data?.ecef ?? [])
         .slice()
         .reverse()
         .map((item) => ({
@@ -109,28 +129,31 @@ function App() {
           z: item.z_coordinate,
           device: item.device_uuid,
         })),
-    [ecef],
+    [locationData.data],
   )
 
   const locationPoints = useMemo(
     () =>
-      locations
+      (locationData.data?.locations ?? [])
+        .slice()
+        .reverse()
         .map((item) => {
           const parsed = parseLocationPoint(item.geography_position)
-          return parsed ? { ...parsed, timestamp: item.timestamp, device_uuid: item.device_uuid } : null
-        })
-        .filter((item): item is ParsedLocationPoint => item !== null),
-    [locations],
-  )
 
-  const latestLocation = locationPoints.at(-1)
+          return {
+            timestamp: new Date(item.timestamp).toLocaleTimeString(),
+            latitude: parsed?.latitude ?? 0,
+            longitude: parsed?.longitude ?? 0,
+          }
+        }),
+    [locationData.data],
+  )
 
   return (
     <main className="app-shell">
       <section className="panel">
         <div className="panel-header">
           <div>
-            <p className="eyebrow">Live telemetry</p>
             <h1>Geo Data Processing Dashboard</h1>
           </div>
           <div className="status-pill">{error ? 'Needs attention' : 'Streaming'}</div>
@@ -154,26 +177,6 @@ function App() {
         </div>
 
         {error ? <p className="error">{error}</p> : null}
-
-        <div className="stats-grid">
-          <article className="stat-card">
-            <span>Total location records</span>
-            <strong>{locations.length}</strong>
-          </article>
-          <article className="stat-card">
-            <span>Total ECEF samples</span>
-            <strong>{ecef.length}</strong>
-          </article>
-          <article className="stat-card">
-            <span>Latest latitude</span>
-            <strong>{latestLocation ? latestLocation.latitude.toFixed(4) : '—'}</strong>
-          </article>
-          <article className="stat-card">
-            <span>Latest longitude</span>
-            <strong>{latestLocation ? latestLocation.longitude.toFixed(4) : '—'}</strong>
-          </article>
-        </div>
-
         <div className="dashboard-grid">
           <article className="chart-card">
             <h2>ECEF coordinate trend</h2>
@@ -185,9 +188,27 @@ function App() {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Line type="monotone" dataKey="x" stroke="#4f46e5" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="y" stroke="#06b6d4" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="z" stroke="#10b981" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="x" stroke="#f79a38" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="y" stroke="#02d9ff" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="z" stroke="#00f9a6" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </article>
+          </div>
+          <div className="dashboard-grid">
+          <article className="chart-card">
+            <h2>Location trend</h2>
+            <div className="chart-box">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={locationPoints} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="timestamp" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="latitude" stroke="#f79a38" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="longitude" stroke="#02d9ff" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

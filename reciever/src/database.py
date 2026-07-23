@@ -49,11 +49,11 @@ def fetchLatestLocationData(limit: int = 10, start_date: str | None = None, end_
     params: list[object] = []
 
     if start_date:
-        conditions.append('llh.timestamp >= TO_TIMESTAMP(%s, \'YYYY-MM-DD"T"HH24:MI\')')
+        conditions.append('llh.timestamp >= TO_TIMESTAMP(%s, \'YYYY-MM-DD"T"HH24:MI:SS\')')
         params.append(start_date)
 
     if end_date:
-        conditions.append('llh.timestamp < TO_TIMESTAMP(%s, \'YYYY-MM-DD"T"HH24:MI\')')
+        conditions.append('llh.timestamp < TO_TIMESTAMP(%s, \'YYYY-MM-DD"T"HH24:MI:SS\')')
         params.append(end_date)
 
     if conditions:
@@ -92,11 +92,11 @@ def fetchLatestECEFData(limit: int = 10, start_date: str | None = None, end_date
     params: list[object] = []
 
     if start_date:
-        conditions.append('ecef.timestamp >= TO_TIMESTAMP(%s, \'YYYY-MM-DD"T"HH24:MI\')')
+        conditions.append('ecef.timestamp >= TO_TIMESTAMP(%s, \'YYYY-MM-DD"T"HH24:MI:SS\')')
         params.append(start_date)
 
     if end_date:
-        conditions.append('ecef.timestamp < TO_TIMESTAMP(%s, \'YYYY-MM-DD"T"HH24:MI\')')
+        conditions.append('ecef.timestamp < TO_TIMESTAMP(%s, \'YYYY-MM-DD"T"HH24:MI:SS\')')
         params.append(end_date)
 
     if conditions:

@@ -39,7 +39,7 @@ def health_check():
 
 @app.get("/api/recentData")
 def get_recent_data(
-    limit: int = Query(default=10, ge=1, le=100),
+    limit: int = Query(default=10, ge=1),
     startDate: str | None = Query(default=None, alias="startDate"),
     endDate: str | None = Query(default=None, alias="endDate"),
 ):
